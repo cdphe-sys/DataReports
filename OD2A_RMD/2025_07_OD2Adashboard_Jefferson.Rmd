@@ -1,0 +1,528 @@
+---
+title: "Colorado Overdose-Related ED Visit Report"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+
+---
+<style>                     
+.navbar {
+  background-color:navy;
+  border-color:white;
+}
+.navbar-brand {
+color:white!important;
+}
+</style> 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+suppressPackageStartupMessages({
+library(flexdashboard)
+library(tidyverse)
+library(DBI)
+library(odbc)
+library(plotly)
+library(extrafont)
+library(extrafontdb)
+library(sysfonts)})
+library(dplyr)
+
+rundate <- as.Date(Sys.Date())    #Set the run date. This will show in the Rmd report. 
+reportdate <- as.Date(Sys.Date())-4 #Set the report date. This will show in the Rmd report.
+
+font_add(family = 'trebuchet', regular = '~/OD2A_RMD/trebuc.ttf')
+
+load("~/OD2A_RMD/RMDOD2Adatacomplete.Rdata")
+
+startdate <- as.Date(format((as.Date(startdate, "%d%b%Y")), "%Y-%m-%d"))
+enddate <- as.Date(format((as.Date(enddate, "%d%b%Y")), "%Y-%m-%d"))
+
+countyname <- "Jefferson"
+
+```
+
+# About
+
+Row {data-height=1000}
+----------------------------------------------------------------------- 
+
+### About This Report
+
+#### **Suspected Overdose Related Emergency Department Visit Syndromic Surveillance Data in Colorado**
+
+Reporting date:  `r paste(format(Sys.time(), "%B %d, %Y"), sep = " ")`
+
+Jurisdiction: `r paste(countyname,'County')`
+
+*Results are preliminary and may change as more data are received.*
+
+**This report focuses on:**
+
+**-** Indicators related to suspected nonfatal overdose (OD) related emergency department (ED) visits during `r paste(format(startdate, "%B %d, %Y"))` to `r paste(format(enddate, "%B %d, %Y"))`. 
+
+**-** Data analyzed by patient location (patient's county of residence) as `r paste(countyname)`.
+
+**-**  The following CDC-validated query definitions were used to identify OD-related ED visits in syndromic surveillance data, per Overdose Data to Action (OD2A) reporting guidance:
+
+* [CDC All Drug v3 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-all-drug-overdose-v3-parsed#:~:text=Definition%20description%3A,of%20unintentional%20or%20undetermined%20intent.)
+* [CDC Benzodiazepine Overdose v2 Parsed](https://knowledgerepository.syndromicsurveillance.org/benzodiazepine-overdose-v2-parsed)
+* [CDC Cocaine Overdose v2 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-cocaine-overdose-v2-parsed)
+* [CDC Fentanyl Overdose v2 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-fentanyl-overdose-v2-parsed)
+* [CDC Heroin Overdose v5 Parsed](https://knowledgerepository.syndromicsurveillance.org/heroin-overdose-v5-parsed)
+* [CDC Methamphetamine Overdose v1 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-methamphetamine-overdose-v1-parsed#:~:text=The%20Methamphetamine%20Overdose%20v1%20Parsed,of%20unintentional%20or%20undetermined%20intent.)
+* [CDC Opioid Overdose v4 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-all-opioid-overdose-v4-parsed)
+* [CDC Stimulants v4 Parsed](https://knowledgerepository.syndromicsurveillance.org/cdc-all-stimulant-overdose-v4-parsed)
+
+**-** ED visits from 82 facilities located in 21 counties throughout the state, as indicated in the map below, representing 90% of all ED visits and 76% of all eligible hospital EDs in CO (as of reporting date).
+
+**Additional Resources**
+
+**-** [Colorado Syndromic Surveillance Program](https://cdphe.colorado.gov/syndromic-surveillance#:~:text=The%20Colorado%20Syndromic%20Surveillance%20Program,%2C%20substance%20overdose%2C%20and%20more.)
+
+**-** [NSSP Knowledge Repository](https://knowledgerepository.syndromicsurveillance.org/)
+
+**-** [MMWR Schedule](https://ndc.services.cdc.gov/wp-content/uploads/MMWR-Weeks-Calendar_2024-2025.pdf)
+
+**Participating Counties**
+
+```{r map, echo=FALSE, out.width="40%", out.height="50%"}
+
+map <- paste0("2025_COSySmap_",countyname,".png")
+
+knitr::include_graphics(file.path("~","OD2A_RMD", "OD2A_RMD_Maps", map))
+
+```
+
+
+# Suspected Overdoses by Substance Type
+
+## Row 1
+
+### Percent Weekly Suspected Overdose-Related ED Visits of Total ED Visits, by Substance Type
+
+```{r OD by drugs, echo = FALSE}
+
+AllOverdoseED_df_perct <- completeOD_df |>
+  select(MMWRyear,
+                MMWRweek, 
+         WeekStart,
+                county, 
+                alldrug_pct, 
+                benzo_pct, 
+                coca_pct, 
+                fent_pct, 
+                heroin_pct,
+                meth_pct,
+                opioid_pct,
+                stim_pct,
+                totalED) |>
+  filter(county == countyname)
+
+AllOverdoseED_df_ct <- completeOD_df |>
+  select(MMWRyear,
+                MMWRweek, 
+         WeekStart,
+                county, 
+                alldrug_ct, 
+                benzo_ct, 
+                coca_ct, 
+                fent_ct, 
+                heroin_ct,
+                meth_ct,
+                opioid_ct,
+                stim_ct,
+                totalED) |>
+  filter(county == countyname)
+
+AllOverdoseED_df_table <- completeOD_df |>
+  select("Week Start Date" = WeekStart,
+                "County" = county, 
+                "All-Drugs" = alldrug_pct, 
+                "Benzodiazepines" = benzo_pct, 
+                "Cocaine" = coca_pct, 
+                "Fentanyl" = fent_pct, 
+                "Heroin" = heroin_pct,
+                "Methamphetamine" = meth_pct,
+                "Opioids" = opioid_pct,
+                "Stimulants" = stim_pct,
+                "Total ED Visits" = totalED) |>
+  filter(County == countyname)
+
+drug_table <- DT::datatable(AllOverdoseED_df_table |> 
+                              mutate_at(vars(ends_with("_pct")), ~paste0(., "%")), rownames = FALSE, class = c("cell-border stripe", "compact"), 
+                            fillContainer = T, 
+                            extensions = c('Buttons', 'FixedColumns'), 
+                            options = list(dom = 'Blfrtip', pageLength = 25, 
+                                           fixedColumns = list(leftColumns = 2), 
+                                           buttons = c('csv', 'excel', 'print'),
+                                           scrollX = TRUE, scrollY = "450px", autoWidth = TRUE,
+                                           columnDefs = list(list(className = 'dt-center', 
+                                                                  targets = "_all"),
+                                                             list(targets='_all', visible=TRUE, width='100'))))
+
+drug_table 
+
+```
+
+## Row 2
+
+### Weekly Number of Suspected Overdose-Related ED Visits by Substance Type
+*Hover over data points for more information.*
+```{r drug graph counts, echo = FALSE, out.width= "100%", out.height= "175%"}
+
+fig <- plot_ly(AllOverdoseED_df_ct, x = ~as.Date(WeekStart))
+
+fig <- config(fig, displaylogo = FALSE) |> 
+  add_lines(y = ~alldrug_ct, name = "All Drugs", type = 'scatter', mode = 'lines', line = list(color = '#17becf')) |>
+  add_lines(y = ~benzo_ct, name = "Benzodiazepines", type = 'scatter', mode = 'lines', line = list(color = '#2ca02c')) |>
+  add_lines(y = ~coca_ct, name = "Cocaine", type = 'scatter', mode = 'lines', line = list(color = '#8c564b')) |>
+  add_lines(y = ~fent_ct, name = "Fentanyl", type = 'scatter', mode = 'lines', line = list(color = '#e377c2')) |>
+  add_lines(y = ~heroin_ct, name = "Heroin", type = 'scatter', mode = 'lines', line = list(color = '#bcbd22')) |>
+  add_lines(y = ~meth_ct, name = "Methamphetamine", type = 'scatter', mode = 'lines', line = list(color = '#d62728')) |>
+  add_lines(y = ~opioid_ct, name = "Opioids", type = 'scatter', mode = 'lines', line = list(color = '#ff7f0e')) |> 
+  add_lines(y = ~stim_ct, name = "Stimulants", type = 'scatter', mode = 'lines', line = list(color = '#9467bd'))
+
+fig <- fig |> layout(
+  title = "Weekly Number of Suspected OD-Related ED Visit by Substance Type",
+  yaxis = list(title = "Number of ED Visits"),
+  xaxis = list(title = "", 
+               showline = FALSE,
+               showgrid = FALSE,
+               showticklabels = TRUE,
+               autotick = TRUE
+               )
+  )
+
+fig <- fig |>
+  layout(hovermode = "x unified")
+
+fig
+
+```
+
+## Row 3
+
+### Weekly Percent Suspected Overdose-Related ED Visits of Total ED Visits, by Substance Type
+*Hover over data points for more information.*
+```{r drug graph percentages, echo = FALSE, out.width= "100%", out.height= "175%"}
+
+fig <- plot_ly(AllOverdoseED_df_perct, x = ~as.Date(WeekStart))
+
+fig <- config(fig, displaylogo = FALSE) |> 
+  add_lines(y = ~alldrug_pct, name = "All Drugs", type = 'scatter', mode = 'lines', line = list(color = '#17becf')) |>
+  add_lines(y = ~benzo_pct, name = "Benzodiazepines", type = 'scatter', mode = 'lines', line = list(color = '#2ca02c')) |>
+  add_lines(y = ~coca_pct, name = "Cocaine", type = 'scatter', mode = 'lines', line = list(color = '#8c564b')) |>
+  add_lines(y = ~fent_pct, name = "Fentanyl", type = 'scatter', mode = 'lines', line = list(color = '#e377c2')) |>
+  add_lines(y = ~heroin_pct, name = "Heroin", type = 'scatter', mode = 'lines', line = list(color = '#bcbd22')) |>
+  add_lines(y = ~meth_pct, name = "Methamphetamine", type = 'scatter', mode = 'lines', line = list(color = '#d62728')) |>
+  add_lines(y = ~opioid_pct, name = "Opioids", type = 'scatter', mode = 'lines', line = list(color = '#ff7f0e')) |> 
+  add_lines(y = ~stim_pct, name = "Stimulants", type = 'scatter', mode = 'lines', line = list(color = '#9467bd'))
+
+
+
+fig <- fig |> layout(
+  title = "Weekly Percent Suspected OD-Related ED Visits of Total ED Visits by Substance Type",
+  yaxis = list(title = "Percent ED Visits", ticksuffix = "%"),
+  xaxis = list(title = "", 
+               showline = FALSE,
+               showgrid = FALSE,
+               showticklabels = TRUE,
+               autotick = TRUE
+               )
+  )
+
+fig <- fig |>
+  layout(hovermode = "x unified")
+fig
+
+```
+
+# Suspected Overdoses by Demographics
+
+## Row 1 {data-height=500}
+
+### Percent of Total (Cumulative) Suspected Overdose-Related ED Visits by Demographic Groups Over Report Time Period
+
+```{r OD demographics, echo = FALSE}
+
+AllOverdoseED_df_demo_pct <- completeOD_df |>
+  select("Week Start Date" = WeekStart,
+         "County" = county,
+         "Female" = sex_f_pct,
+         "Male" = sex_m_pct,
+         "Unknown Sex" = sex_unk_pct,
+         "0-17 yrs" = age_0017_pct,
+         "18-25 yrs" = age_1825_pct,
+         "26-34 yrs" = age_2634_pct,
+         "35-44 yrs" = age_3544_pct,
+         "45-54 yrs" = age_4554_pct,
+         "55-64 yrs" = age_5564_pct,
+         "65+ yrs" = age_65_pct,
+         "American Indian or Alaska Native" = race_AIAN_pct,
+         "Asian" = race_asian_pct,
+         "Black or African American" = race_black_pct,
+         "Native Hawaiian or Other Pacific Islander" = race_NHPI_pct,
+         "White" = race_white_pct,
+         "Other Race" = race_other_pct,
+         "Unknown Race" = race_unk_pct,
+         "Hispanic or Latino" = ethn_hisp_pct,
+         "Not Hispanic or Latino" = ethn_nothisp_pct,
+         "Unknown Ethnicity" = ethn_unk_pct) |>
+  filter(County == countyname)
+
+sketch = htmltools::withTags(table(
+  class = 'display',
+  thead(
+    tr(
+      th(rowspan = 1, ''),
+      th(rowspan = 1, ''),
+      th(class = 'dt-center', colspan = 3, "Sex"),
+      th(class = 'dt-center', colspan = 7, "Age Group"),
+      th(class = 'dt-center', colspan = 7, "Race"),
+      th(class = 'dt-center', colspan = 3, "Ethnicity")
+      
+    ),
+    tr(
+      lapply(c("Week Start Date", "County", "Female", "Male", "Unknown Sex", "00-17", "18-25",	"26-34", "35-44", "45-54", "55-64",	"65+",  "American Indian or Alaska Native", "Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander", "Other Race", "White", "Unknown Race", "Hispanic or Latino", "Not Hispanic or Latino", "Unknown Ethnicity")
+, th)
+    )
+  )
+))
+
+headjs <- "function(thead) {
+    $(thead).closest('thead').find('th').eq(2).css('background-color', '#CFD8DC');
+    $(thead).closest('thead').find('th').eq(3).css('background-color', '#B0BEC5');
+    $(thead).closest('thead').find('th').eq(4).css('background-color', '#CFD8DC');
+    $(thead).closest('thead').find('th').eq(5).css('background-color', '#B0BEC5');
+ }"
+
+demo_table <- DT::datatable(AllOverdoseED_df_demo_pct, 
+                            rownames = FALSE, container = sketch, 
+                            class = c("cell-border stripe", "compact"), 
+                            fillContainer = T, 
+                            extensions = c('Buttons', 'FixedColumns'), 
+                            options = list(dom = 'Blfrtip', headerCallback = DT::JS(headjs), 
+                                           pageLength = 25,
+                                           fixedColumns = list(leftColumns = 2),
+                                           buttons = c('csv', 'excel', 'print'), 
+                                           scrollX = TRUE, 
+                                           scrollY = "450px", 
+                                           autoWidth = TRUE, 
+                                           columnDefs = list(list(className = 'dt-center', targets = "_all"),
+                                                             list(targets='_all', visible=TRUE, width='125px'))))
+
+demo_table 
+
+```
+## Row 2 {data-height=600}
+
+### Percent of Total (Cumulative) Suspected Overdose-Related ED Visits by Sex Over Report Time Period
+*Hover over data points for more information.*
+```{r bar sex, echo=FALSE, fig.dim=c(3,3)}
+
+AllOverdoseED_df_demo_ct <- completeOD_df |>
+  select(MMWRyear,
+                MMWRweek, 
+         WeekStart,
+                county, 
+                totalED,
+         age_totalOD,
+         age_0017_ct,
+         age_1825_ct,
+         age_2634_ct,
+         age_3544_ct,
+         age_4554_ct,
+         age_5564_ct,
+         age_65_ct,
+         sex_f_ct,
+         sex_m_ct,
+         sex_unk_ct,
+         race_AIAN_ct,
+         race_asian_ct,
+         race_black_ct,
+         race_NHPI_ct,
+         race_white_ct,
+         race_other_ct,
+         race_unk_ct,
+         ethn_hisp_ct,
+         ethn_nothisp_ct,
+         ethn_unk_ct)
+
+AllOverdoseED_df_sex <- AllOverdoseED_df_demo_ct |>
+  select(WeekStart,
+         county,
+         age_totalOD,
+         sex_f_ct, 
+         sex_m_ct,
+         sex_unk_ct)
+
+AllOverdoseED_df_sex <-AllOverdoseED_df_sex |>
+  pivot_longer(
+    cols = starts_with("sex"),
+    names_to = "sex",
+    names_prefix = "sex",
+    values_to = "counts",
+    values_drop_na = TRUE
+  ) |>
+  mutate(sex = recode(sex, "_f_ct" = "Female"),
+         sex = recode(sex, "_m_ct" = "Male"),
+         sex = recode(sex,"_unk_ct" = "Unknown Sex")) |>
+  group_by(sex) |>
+  summarise(total_counts = sum(counts)) |>
+  mutate(percentage = (total_counts/sum(total_counts)) * 100) |>
+  mutate(across(percentage, round, 2))
+
+fig <- plot_ly(AllOverdoseED_df_sex) |>
+  add_bars(x = ~percentage, y = ~sex, type = 'bar', width = .35, orientation = 'h', text = ~total_counts, textposition = "none", marker = list(line = list(color = "black", width = .85)))
+fig <- fig |> layout(
+  yaxis = list(categoryorder = "array",
+               categoryarray = c('Female', 'Male', 'Unknown Sex')),
+  xaxis = list(ticksuffix = "%",  range = c(0, 100)))
+fig <- plotly::config(fig, displaylogo = FALSE) |> layout(
+  xaxis = list(title = ""),
+  yaxis = list(title = "", automargin = TRUE, ticks="outside"))
+fig
+
+```
+
+### Percent of Total (Cumulative) Suspected Overdose-Related ED Visits by Age Over Report Time Period
+*Hover over data points for more information.*
+```{r bar age, echo=FALSE, fig.dim=c(3,3)}
+
+AllOverdoseED_df_age <- AllOverdoseED_df_demo_ct |>
+  select(WeekStart,
+         county,
+         age_0017_ct,
+         age_1825_ct,
+         age_2634_ct,
+         age_3544_ct,
+         age_4554_ct,
+         age_5564_ct,
+         age_65_ct,
+         age_totalOD)
+
+AllOverdoseED_df_age <-AllOverdoseED_df_age |>
+  pivot_longer(
+    cols = ends_with("_ct"),
+    names_to = "age_grp",
+    values_to = "counts",
+    values_drop_na = TRUE
+  ) |>
+  mutate(age_grp =recode(age_grp, "age_0017_ct" = "00-17"),
+         age_grp = recode(age_grp, "age_1825_ct" = "18-25"),
+         age_grp = recode(age_grp, "age_2634_ct" = "26-34"),
+         age_grp = recode(age_grp, "age_3544_ct" = "35-44"),
+         age_grp = recode(age_grp, "age_4554_ct" = "45-54"),
+         age_grp = recode(age_grp, "age_5564_ct" = "55-64"),
+         age_grp = recode(age_grp, "age_65_ct" = "65+")
+        )|>
+  group_by(age_grp) |>
+  summarise(total_counts = sum(counts)) |>
+  ungroup() |>
+  mutate(percentage = (total_counts/sum(total_counts)) * 100) |>
+  mutate(across(percentage, round, 2))
+
+fig <- plot_ly(AllOverdoseED_df_age) |>
+  add_bars(x = ~percentage, y = ~age_grp, type = 'bar', orientation = 'h', text = ~total_counts,
+               textposition = "none", marker = list(line = list(color = "black", width = .85)))
+fig <- fig |> layout(
+  yaxis = list(categoryorder = "array",
+               categoryarray = c('00-17', '18-25', '26-34', '35-44', '45-54', '55-64', '65+')),
+  xaxis = list(ticksuffix = "%",  range = c(0, 100)))
+fig <- config(fig, displaylogo = FALSE) |> layout(
+  xaxis = list(title = ""),
+ yaxis = list(title = "", automargin = TRUE, ticks="outside"))
+fig
+
+```
+
+## Row 3 {data-height=600}
+
+### Percent of Total (Cumulative) Suspected Overdose-Related ED Visits by Race Over Report Time Period
+*Hover over data points for more information.*
+```{r bar race, echo=FALSE, fig.dim=c(3,3)}
+
+AllOverdoseED_df_race <- AllOverdoseED_df_demo_ct |>
+  select(WeekStart,
+         county,
+         age_totalOD,
+         race_AIAN_ct, 
+         race_asian_ct,
+         race_black_ct,
+         race_NHPI_ct,
+         race_white_ct,
+         race_other_ct,
+         race_unk_ct)
+
+AllOverdoseED_df_race <-AllOverdoseED_df_race |>
+  pivot_longer(
+    cols = ends_with("_ct"),
+    names_to = "race",
+    values_to = "counts",
+    values_drop_na = TRUE
+  ) |>
+  mutate(race =recode(race, "race_AIAN_ct" = "American Indian or Alaska Native"),
+         race = recode(race, "race_asian_ct" = "Asian"),
+         race = recode(race, "race_black_ct" = "Black or African American"),
+         race = recode(race, "race_NHPI_ct" = "Native Hawiian or Pacific Islander"),
+         race = recode(race, "race_white_ct" = "White"),
+         race = recode(race, "race_other_ct" = "Other Race"),
+         race = recode(race, "race_unk_ct" = "Unknown Race")) |>
+  group_by(race) |>
+  summarise(total_counts = sum(counts)) |>
+  mutate(percentage = (total_counts/sum(total_counts)) * 100) |>
+  mutate(across(percentage, round, 2))
+
+fig <- plot_ly(AllOverdoseED_df_race) |>
+  add_bars(x = ~percentage, y = ~race, type = 'bar', width = .70, orientation = 'h', text = ~total_counts,
+               textposition = "none", marker = list(line = list(color = "black", width = .85)))
+fig <- fig |> layout(
+  yaxis = list(categoryorder = "array",
+               categoryarray = c('American Indian or Alaska Native', 'Asian', 'Black or African American', 'Native Hawiian or Pacific Islander', 'White', 'Other Race', 'Unknown Race')),
+  xaxis = list(ticksuffix = "%",  range = c(0, 100)))
+fig <- plotly::config(fig, displaylogo = FALSE) |> layout(
+  xaxis = list(title = ""),
+ yaxis = list(title = "", automargin = TRUE, ticks="outside"))
+fig
+```
+
+### Percent of Total (Cumulative) Suspected Overdose-Related ED Visits by Ethnicity Over Report Time Period
+*Hover over data points for more information.*
+```{r bar ethnicity, echo=FALSE, fig.dim=c(3,3)}
+
+AllOverdoseED_df_ethnicity <- AllOverdoseED_df_demo_ct |>
+  select(WeekStart,
+         county,
+         age_totalOD,
+         ethn_hisp_ct, 
+         ethn_nothisp_ct,
+         ethn_unk_ct)
+
+AllOverdoseED_df_ethnicity <-AllOverdoseED_df_ethnicity |>
+  pivot_longer(
+    cols = ends_with("_ct"),
+    names_to = "ethnicity",
+    values_to = "counts",
+    values_drop_na = TRUE
+  ) |>
+  mutate(ethnicity =recode(ethnicity, "ethn_hisp_ct" = "Hispanic or Latino"),
+         ethnicity = recode(ethnicity, "ethn_nothisp_ct" = "Not Hispanic or Latino"),
+         ethnicity = recode(ethnicity, "ethn_unk_ct" = "Unknown Ethnicity")) |>
+  group_by(ethnicity) |>
+  summarise(total_counts = sum(counts)) |>
+  mutate(percentage = (total_counts/sum(total_counts)) * 100) |>
+  mutate(across(percentage, round, 2))
+
+fig <- plot_ly(AllOverdoseED_df_ethnicity) |>
+  add_bars(x = ~percentage, y = ~ethnicity, type = 'bar', width = .35, orientation = 'h', text = ~total_counts, textposition = "none", marker = list(line = list(color = "black", width = .85)))
+fig <- fig |> layout(
+  yaxis = list(categoryorder = "array",
+               categoryarray = c('Hispanic or Latino', 'Not Hispanic or Latino', 'Unknown Ethnicity')),
+  xaxis = list(ticksuffix = "%",  range = c(0, 100)))
+fig <- plotly::config(fig, displaylogo = FALSE) |> layout(
+  xaxis = list(title = ""),
+ yaxis = list(title = "", automargin = TRUE, ticks="outside"))
+fig
+
+```
