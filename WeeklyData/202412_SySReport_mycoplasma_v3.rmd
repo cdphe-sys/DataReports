@@ -1,0 +1,333 @@
+---
+title: "Colorado Syndromic Surveillance Program"
+subtitle: "Pediatric Mycoplasma Pneumonia ** FOR INTERNAL USE ONLY **"
+author: "Contact: "
+date: Sys.Date()
+output: 
+  word_document:
+    reference_docx: "word_style_v1.docx"
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.height = 5, fig.width = 8.5)
+
+library(flextable)
+library(knitr)
+library(pacman)
+library(purrr)
+library(extrafont)
+library(extrafontdb)
+library(sysfonts)
+library(showtextdb)
+library(showtext)
+library(wesanderson)
+library(officer)
+
+font_add(family = 'trebuchet', regular = '~/WeeklyData/trebuc.ttf')
+
+pacman::p_load(tidyverse, tidycensus, sjmisc, patchwork, Rnssp)
+
+
+```
+
+```{r set_end_start_dates, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+wes.pal.br2 <- wes_palette("BottleRocket2")
+wes.pal.zs1 <- wes_palette("Zissou1")
+wes.pal.ff1 <- wes_palette("FantasticFox1")
+wes.pal.id2 <- wes_palette("IsleofDogs2")
+wes.pal.rm1 <- wes_palette("Rushmore1")
+
+```
+
+```{r set_facilities_or_counties, include=FALSE}
+#fac <- ""
+counties <- "co_adams&geography=co_arapahoe&geography=co_boulder&geography=co_broomfield&geography=co_denver&geography=co_douglas&geography=co_el%20paso&geography=co_jefferson&geography=co_la%20plata&geography=co_larimer&geography=co_mesa&geography=co_pueblo%geography=co_weld&geography=co_rio%20blanco"
+
+```
+
+```{r set_nssp_user_profile, echo=FALSE, message=FALSE, include=FALSE}
+## Set NSSP user profile
+myProfile <- readRDS("~/WeeklyData/myProfile.rds")
+```
+
+**Background**
+
+This report provides information regarding trends of emergency department (ED) visits in syndromic surveillance data that meet the Centers for Disease Control and Prevention (CDC) draft definitions for mycoplasma pneumonia.
+
+**Methods & Syndrome Definitions**
+
+- All data in this report reflect Colorado ED visits of pediatric patients, ages 0-17 years.
+- Hospital ED visits related to mycoplasma pneumonia were identified if patients met the syndromic surveillance definition by searching the discharge diagnosis field for related codes (ICD-10 CM: J20.0 or J15.7).
+- Hospital ED visits related to pneumonia were identified if patients met syndromic surveillance definition by searching the discharge diagnosis field for related codes (ICD-10 CM codes: J09.X1, J10.00–01, J10.08, J11.00, J11.08, J12.0–.3, J12.8–.9, J13, J14, J15.0–9, J16.0, J16.8, J78, J18.0–2, J18.8–.9, J80, A48.1, or J20.0).
+- The national and Colorado weekly percent ED visits related to mycoplasma pneumonia were calculated using total ED visits as the denominator. The Colorado percent ED visits related to mycoplasma pneumonia by age groups were calculated using total pneumonia-related ED visits as the denominator.
+
+
+
+**Limitations**
+
+- The Colorado Syndromic Surveillance Program has been collecting timely syndromic surveillance data for situational awareness and enhanced response to hazardous events and disease outbreaks since 2013. Onboarded facilities are required to submit hourly data and all records must include both chief complaint and discharge diagnosis fields.
+- Syndromic surveillance data, while timely and thorough, are updated on an hourly basis. Therefore, this data is preliminary.
+- The syndromic surveillance ESSENCE system employs search tools to identify visits based on their free text fields (chief complaint and triage notes) and/or discharge diagnosis codes (ICD-10). Chief complaints are not diagnoses, and the free text fields may contain spelling errors or abbreviations.
+- The Colorado Syndromic Surveillance Program has 67 participating emergency departments located in 15 counties (Adams, Arapahoe, Boulder, Broomfield, Denver, Douglas, El Paso, Jefferson, La Plata, Larimer, Mesa, Montezuma, Pueblo, Rio Blanco, and Weld).
+- Additionally, syndromic surveillance data presented in this report reflect non-fatal emergency department visits, and some patients may be counted multiple times (for multiple visits) over the analysis period. Syndromic surveillance data are not a representative sample of the population and are not intended to characterize the true burden of the selected health indicators in the community.
+
+```{r data_pull, include = FALSE}
+
+load("RMD_mycoplasmareport_data.Rdata")
+load("RMD_mycoplasmareport_national.Rdata")
+
+df_total <- df_final %>%
+  filter(agegroup == "total")
+
+#adjust column selection & renaming
+counttable <- df_total%>%
+  select("MMWR Week Start" = WeekStart,
+         "MP-related ED Visits (%)" = myco_pct,
+         "MP-related ED Visits (Count)" = myco_ct,
+         "Total Pneumonia-Related ED Visits" = pneu_ct) 
+counttable[,'MP-related ED Visits (%)']=round(counttable[,'MP-related ED Visits (%)'],2)
+
+```
+\newpage
+**Data Table: Weekly Percent & Counts of ED Visits Related to Pediatric Mycoplasma Pneumonia**
+```{r table, echo=FALSE, message=FALSE, results = 'asis'}
+
+set_flextable_defaults(font.family = "Trebuchet MS")
+
+table <- flextable(counttable) %>%
+  set_table_properties(layout = "autofit") %>%
+  fontsize(size = 10, part = "header") %>%
+  fontsize(size = 10, j = c(1:4)) %>%
+  line_spacing(space = 0.3, part = "all")
+
+table
+
+```
+\newpage
+**Data Trends: National & Colorado Weekly Percent (Denominator: Total ED Visits)**
+```{r national plot, echo=FALSE, message=FALSE, echo = FALSE}
+
+ggplot(data = overall_mycoplasma, aes(x = as.Date(date), y = percent)) +
+  geom_line(aes(linetype = geo), color = wes.pal.ff1[3]) +
+  labs(title = "Percent Weekly ED Visits Related to Pediatric Mycoplasma Pneumonia (0-17 yrs), \nNationally and in Colorado",
+       x = "Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "6 month") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 11),
+        legend.title = element_blank(),
+        legend.text = element_text(size=11),
+        legend.position = "top",
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+```
+**Data Trends: Weekly Counts**
+```{r count plots, echo=FALSE, message=FALSE, echo = FALSE}
+
+agetotal <- df_final %>%
+  filter(agegroup == "total")
+
+totalage_ct <- ggplot(data = agetotal, aes(x = WeekStart, y = myco_ct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Weekly ED Visits Related to Mycoplasma Pneumonia Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+
+age0004 <- df_final %>%
+  filter(agegroup == "00-04")
+
+age0004_ct <- ggplot(data = age0004, aes(x = WeekStart, y = myco_ct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Weekly ED Visits Related to Mycoplasma \nPneumonia Among Youth Ages 0-4yrs in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+age0509 <- df_final %>%
+  filter(agegroup == "05-09")
+
+age0509_ct <- ggplot(data = age0509, aes(x = WeekStart, y = myco_ct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Weekly ED Visits Related to Mycoplasma \nPneumonia Among Youth Ages 5-9yrs in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+age1014 <- df_final %>%
+  filter(agegroup == "10-14")
+
+age1014_ct <- ggplot(data = age1014, aes(x = WeekStart, y = myco_ct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Weekly ED Visits Related to Mycoplasma \nPneumonia Among Youth Ages 10-14yrs in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+age1517 <- df_final %>%
+  filter(agegroup == "15-17")
+
+age1517_ct <- ggplot(data = age1517, aes(x = WeekStart, y = myco_ct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Weekly ED Visits Related to Mycoplasma \nPneumonia Among Youth Ages 15-17yrs in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+totalage_ct
+age0004_ct
+age0509_ct
+age1014_ct
+age1517_ct
+
+```
+\newpage
+**Data Trends: Weekly Percent (Denominator: All Pneumonia-Related ED Visits)**
+```{r percent plots, echo=FALSE, message=FALSE, echo = FALSE}
+
+
+
+totalage_pct <- ggplot(data = agetotal, aes(x = WeekStart, y = myco_pct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to Mycoplasma Pneumonia Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Percent of Pneumonia-Related ED Visits") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 12),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+
+age0004_pct <- ggplot(data = age0004, aes(x = WeekStart, y = myco_pct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to \nMycoplasma Pneumonia Among Youth \nAges 0-4yrs in CO",
+       x = "Week Start Date",
+       y = "Percent of Pneumonia-Related ED Visits") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+
+age0509_pct <- ggplot(data = age0509, aes(x = WeekStart, y = myco_pct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to \nMycoplasma Pneumonia Among Youth \nAges 5-9yrs in CO",
+       x = "Week Start Date",
+       y = "Percent of Pneumonia-Related ED Visits") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+
+age1014_pct <- ggplot(data = age1014, aes(x = WeekStart, y = myco_pct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to \nMycoplasma Pneumonia Among Youth \nAges 10-14yrs in CO",
+       x = "Week Start Date",
+       y = "Percent of Pneumonia-Related ED Visits") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+age1517_pct <- ggplot(data = age1517, aes(x = WeekStart, y = myco_pct)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to \nMycoplasma Pneumonia Among Youth \nAges 15-17yrs in CO",
+       x = "Week Start Date",
+       y = "Percent of Pneumonia-Related ED Visits") +
+  theme_classic() +
+  scale_x_date(date_labels = "%b %y", date_breaks = "2 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+totalage_pct
+age0004_pct
+age0509_pct
+age1014_pct
+age1517_pct
+
+```

@@ -1,0 +1,275 @@
+---
+title: "Colorado Syndromic Surveillance Program"
+subtitle: "iGAS Report ** FOR INTERNAL USE ONLY **"
+author: "Contact: "
+date: Sys.Date()
+output: 
+  word_document:
+    reference_docx: "word_style_v1.docx"
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.height = 5, fig.width = 8.5)
+
+library(flextable)
+library(knitr)
+library(pacman)
+library(purrr)
+library(extrafont)
+library(extrafontdb)
+library(sysfonts)
+library(showtextdb)
+library(showtext)
+library(wesanderson)
+library(officer)
+library(scales)
+
+font_add(family = 'trebuchet', regular = '~/WeeklyData/trebuc.ttf')
+
+pacman::p_load(tidyverse, tidycensus, sjmisc, patchwork, Rnssp)
+
+
+```
+
+```{r set_end_start_dates, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+
+wes.pal.br2 <- wes_palette("BottleRocket2")
+wes.pal.zs1 <- wes_palette("Zissou1")
+wes.pal.ff1 <- wes_palette("FantasticFox1")
+wes.pal.dj1 <- wes_palette("Darjeeling1")
+wes.pal.rm1 <- wes_palette("Rushmore1")
+
+```
+
+```{r set_facilities_or_counties, include=FALSE}
+#fac <- ""
+counties <- "co_adams&geography=co_arapahoe&geography=co_boulder&geography=co_broomfield&geography=co_denver&geography=co_douglas&geography=co_el%20paso&geography=co_jefferson&geography=co_la%20plata&geography=co_larimer&geography=co_mesa&geography=co_pueblo%geography=co_weld&geography=co_rio%20blanco"
+
+```
+
+```{r set_nssp_user_profile, echo=FALSE, message=FALSE, include=FALSE}
+## Set NSSP user profile
+myProfile <- readRDS("~/WeeklyData/myProfile.rds")
+```
+
+**Background**
+
+This report provides information regarding trends of emergency department (ED) visits in syndromic surveillance data that meet the Centers for Disease Control and Prevention (CDC) draft definitions for invasive Group A streptococcus (iGAS), streptococcal pharyngitis, and scarlet fever.
+
+**Methods & Syndrome Definitions**
+
+- All data in this report reflect Colorado ED visits among the total population and pediatric patients (0-17 years).
+- Hospital ED visits related to iGAS were identified if patients meet the syndromic surveillance definition by searching the discharge diagnosis field for related codes (ICD-10 CM: A40.0, B95.0, A48.3, G00.2, G06.0, J15.4, J17, J36, J85.1, J86.0, M72.6, R65.2, or R78.81).
+- Hospital ED visits related to streptococcal pharyngitis were identified if patients meet the syndromic surveillance definition by searching the discharge diagnosis field for the related code (ICD-10 CM: J02).
+- Hospital ED visits related to scarlet fever were identified if patients meet the syndromic surveillance definition by searching the discharge diagnosis field for the related code (ICD-10 CM: A38).
+- Statistical analyses were performed in NSSP BioSense ESSENCE using linear regression and exponentially weighted moving averages. Data warnings ([yellow]{custom-style="Yellow1"} points) indicate observed increases that are only statistically significant at p < 0.05, while data alerts ([orange]{custom-style="Orange1"} points) indicate observed increases that are statistically significant at p < 0.01.
+
+**Limitations**
+
+- The Colorado Syndromic Surveillance Program has collected timely syndromic surveillance data for situational awareness and enhanced response to hazardous events and disease outbreaks since 2013. Onboarded facilities are required to submit hourly data and all records must include both chief complaint and discharge diagnosis fields.
+- Syndromic surveillance, while timely and thorough, is updated on an hourly basis. Therefore, these data are preliminary.
+- The syndromic surveillance ESSENCE system employs search tools to identify visits based on their free text fields (chief complaint and triage notes) and/or discharge diagnosis codes (ICD-10). Chief complaints are not diagnoses, and the free text fields may contain spelling errors or abbreviations.
+- The Colorado Syndromic Surveillance Program has 67 participating emergency departments located in 15 counties (Adams, Arapahoe, Boulder, Broomfield, Denver, Douglas, El Paso, Jefferson, La Plata, Larimer, Mesa, Montezuma, Pueblo, Rio Blanco, and Weld).
+- Additionally, syndromic surveillance data presented in this report reflect non-fatal emergency department visits, and some patients may be counted multiple times (for multiple visits) over the analysis period. Syndromic surveillance data are not a representative sample of the population and are not intended to characterize the true burden of the selected health indicators in the community.
+
+```{r data_pull, include = FALSE}
+
+load("RMD_igasreport_percent_data.Rdata")
+load("RMD_igasreport_counts_data.Rdata")
+
+```
+\newpage
+**Data Trends: Weekly Percent by Age Group**
+```{r count plots, echo=FALSE, message=FALSE, echo = FALSE}
+
+totalpop_pct <- igasreport_percent %>%
+  filter(agegroup == "total")
+
+phar_total_percent <- ggplot(data = totalpop_pct, aes(x = date, y = percent)) +
+  geom_line(data = subset(totalpop_pct, category == "Streptococcal Pharyngitis"), color = wes.pal.zs1[1]) +
+  geom_point(data = subset(totalpop_pct, category == "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(totalpop_pct, category == "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to Streptococcal \nPharyngitis Among Total Population in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+igas_total_percent <- ggplot(data = totalpop_pct, aes(x = date, y = percent)) +
+  geom_line(data = subset(totalpop_pct, category != "Streptococcal Pharyngitis"), aes(color = category)) +
+  scale_color_manual(values=c(wes.pal.dj1[2],wes.pal.ff1[4]))+
+  geom_point(data = subset(totalpop_pct, category != "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(totalpop_pct, category != "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to iGAS and \nScarlet Fever Among Total Population in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+peds_pct <- igasreport_percent %>%
+  filter(agegroup == "pediatric")
+
+phar_peds_percent <- ggplot(data = peds_pct, aes(x = date, y = percent)) +
+  geom_line(data = subset(peds_pct, category == "Streptococcal Pharyngitis"), color = wes.pal.zs1[1]) +
+  geom_point(data = subset(peds_pct, category == "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(peds_pct, category == "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to Streptococcal \nPharyngitis Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+igas_peds_percent <- ggplot(data = peds_pct, aes(x = date, y = percent)) +
+  geom_line(data = subset(peds_pct, category != "Streptococcal Pharyngitis"), aes(color = category), position = position_dodge(width = 2)) +
+  scale_color_manual(values=c(wes.pal.dj1[2],wes.pal.ff1[4]))+
+  geom_point(data = subset(peds_pct, category != "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(peds_pct, category != "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to iGAS and \nScarlet Fever Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+phar_total_percent + phar_peds_percent
+igas_total_percent + igas_peds_percent
+
+```
+
+\newpage
+**Data Trends: Weekly Counts by Age Group**
+```{r percent plots, echo=FALSE, message=FALSE, echo = FALSE}
+
+totalpop_ct <- igasreport_counts %>%
+  filter(agegroup == "total")
+
+phar_total_count <- ggplot(data = totalpop_ct, aes(x = date, y = count)) +
+  geom_line(data = subset(totalpop_ct, category == "Streptococcal Pharyngitis"), color = wes.pal.zs1[1]) +
+  geom_point(data = subset(totalpop_ct, category == "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(totalpop_ct, category == "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Weekly ED Visits Related to Streptococcal \nPharyngitis Among Total Population in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+igas_total_count <- ggplot(data = totalpop_ct, aes(x = date, y = count)) +
+  geom_line(data = subset(totalpop_ct, category != "Streptococcal Pharyngitis"), aes(color = category)) +
+  scale_color_manual(values=c(wes.pal.dj1[2],wes.pal.ff1[4]))+
+  geom_point(data = subset(totalpop_ct, category != "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(totalpop_ct, category != "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Weekly ED Visits Related to iGAS and \nScarlet Fever Among Total Population in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+peds_ct <- igasreport_counts %>%
+  filter(agegroup == "pediatric")
+
+phar_peds_count <- ggplot(data = peds_ct, aes(x = date, y = count)) +
+  geom_line(data = subset(peds_ct, category == "Streptococcal Pharyngitis"), color = wes.pal.zs1[1]) +
+  geom_point(data = subset(peds_ct, category == "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(peds_ct, category == "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Weekly ED Visits Related to Streptococcal \nPharyngitis Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = pretty_breaks()) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+igas_peds_count <- ggplot(data = peds_ct, aes(x = date, y = count)) +
+  geom_line(data = subset(peds_ct, category != "Streptococcal Pharyngitis"), aes(color = category), position = position_dodge(width = 2)) +
+  scale_color_manual(values = c(wes.pal.dj1[2],wes.pal.ff1[4]))+
+  geom_point(data = subset(peds_ct, category != "Streptococcal Pharyngitis" & alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(peds_ct, category != "Streptococcal Pharyngitis" & alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Weekly ED Visits Related to iGAS and \nScarlet Fever Among Youth (0-17yrs) in CO",
+       x = "Week Start Date",
+       y = "Emergency Visits (Count)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%m/%d/%y", date_breaks = "2 month") +
+  scale_y_continuous(breaks = 1) +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 11),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+phar_total_count + phar_peds_count
+igas_total_count + igas_peds_count
+
+```

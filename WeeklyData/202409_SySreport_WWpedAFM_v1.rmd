@@ -1,0 +1,173 @@
+---
+title: "Colorado Syndromic Surveillance Program"
+subtitle: "Wastewater Surveillance - Pediatric Asthma & AFM ** FOR INTERNAL USE ONLY **"
+author: "Contact: "
+date: Sys.Date()
+output: 
+  word_document:
+    reference_docx: "word_style_v1.docx"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+knitr::opts_chunk$set(fig.height = 5, fig.width = 8.5)
+
+library(pacman)
+library(purrr)
+library(extrafont)
+library(extrafontdb)
+library(sysfonts)
+library(showtextdb)
+library(showtext)
+library(wesanderson)
+
+font_add(family = 'trebuchet', regular = '~/WeeklyData/trebuc.ttf')
+
+pacman::p_load(tidyverse, tidycensus, sjmisc, patchwork, Rnssp)
+
+load("RMD_wwpedafm_data.Rdata")
+
+```
+
+```{r set_end_start_dates, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+startdate <- "31Dec2023" #written in sys date format (ex. 27Jul2023)
+
+category_list <- "cdc%20afm%20broad%20v1-limit%20to%20pediatric&ccddCategory=cdc%20afm%20narrow%20v1-limit%20to%20pediatric&ccddCategory=cdc%20asthma%20ccdd%20v1" #written exactly as it appears in ESSENCE, with %20 used as spaces
+
+wes.pal.br2 <- wes_palette("BottleRocket2")
+wes.pal.zs1 <- wes_palette("Zissou1")
+wes.pal.ff1 <- wes_palette("FantasticFox1")
+wes.pal.id2 <- wes_palette("IsleofDogs2")
+wes.pal.rm1 <- wes_palette("Rushmore1")
+```
+
+```{r set_facilities_or_counties, include=FALSE}
+#fac <- ""
+counties <- "co_adams&geography=co_arapahoe&geography=co_boulder&geography=co_broomfield&geography=co_denver&geography=co_douglas&geography=co_el%20paso&geography=co_jefferson&geography=co_la%20plata&geography=co_larimer&geography=co_mesa&geography=co_pueblo%geography=co_weld&geography=co_rio%20blanco"
+
+```
+
+```{r set_nssp_user_profile, echo=FALSE, message=FALSE, include=FALSE}
+## Set NSSP user profile
+myProfile <- readRDS("~/WeeklyData/myProfile.rds")
+```
+
+**Background**
+
+This report provides information regarding trends of emergency department (ED) visits in syndromic surveillance data that meet the Centers for Disease Control and Prevention (CDC) definitions for asthma and acute flaccid myelitis (AFM).
+
+**Methods & Syndrome Definitions**
+
+- All data in this report reflect patients who are residents of Colorado, ages 0-17 years.
+- Hospital ED visits related to asthma are identified if patients meet the syndromic surveillance definition by searching chief complaint text terms related to asthma, bronchospasm, or reactive airway disease, or a related discharge diagnosis code (ICD-10 CM: J45).
+- Hospital ED visits related to AFM (broad definition) are identified if patients meet the syndromic surveillance definition by searching chief complaint text terms related to acute flaccid myelitis or AFM, or a related discharge diagnosis code (ICD-10 CM: A80.9, G04.02, G04.89, G04.91, G05.4, G12.20 G12.29, G12.8, G82.20-22, G83.0, G83.82, G83.9).
+- Hospital ED visits related to AFM (narrow definition) syndromic surveillance definition is similar to the AFM (broad) definition previously described, but includes more chief complaint text terms related to muscle weakness, limb or extremity weakness, *plegia, and a more limited list of discharge diagnosis codes (ICD-10 CM: A80.9, G04.02, G04.89, G04.91, G05.4, G12.20, G12.29, G12.8, G82.20-22).
+- Statistical analyses were performed in NSSP BioSense ESSENCE using linear regression and exponentially weighted moving averages. Data warnings ([yellow]{custom-style="Yellow1"} points) indicate observed increases that are only statistically significant at p < 0.05, while data alerts ([orange]{custom-style="Orange1"} points) indicate observed increases that are statistically significant at p < 0.01.
+
+**Limitations**
+
+- The Colorado Syndromic Surveillance Program has been collecting timely syndromic surveillance data for situational awareness and enhanced response to hazardous events and disease outbreaks since 2013. Onboarded facilities are required to submit hourly data and all records must include both chief complaint and discharge diagnosis fields.
+- Syndromic surveillance, while timely and thorough, is updated on an hourly basis. Therefore, this data is preliminary.
+- The syndromic surveillance ESSENCE system employs search tools to identify visits based on their free text fields (chief complaint and triage notes) and/or discharge diagnosis codes (ICD-10). Chief complaints are not diagnoses, and the free text fields may contain spelling errors or abbreviations.
+- The Colorado Syndromic Surveillance Program has 65 participating emergency departments located in 14 counties (Adams, Arapahoe, Boulder, Broomfield, Denver, Douglas, El Paso, Jefferson, La Plata, Larimer, Mesa, Pueblo, Rio Blanco, and Weld).
+- Additionally, Syndromic surveillance data presented in this report reflect non-fatal emergency department visits, and some patients may be counted multiple times (for multiple visits) over the analysis period. Syndromic surveillance data are not a representative sample of the population and are not intended to characterize the true burden of the selected health indicators in the community.
+
+```{r data_pull, include = FALSE}
+
+totalage <- overall %>%
+  filter(AgeGroup == "totalage")
+
+#Use url_ts if pulling timeseries data table with detection
+url_ts <- paste0("https://essence.syndromicsurveillance.org/nssp_essence/api/timeSeries?geography=co&datasource=va_er&startDate=",startdate,"&medicalGroupingSystem=essencesyndromes&userId=3942&endDate=",enddate,"&ageschool=00-04&ageschool=05-11&ageschool=12-17&percentParam=ccddCategory&aqtTarget=TimeSeries&ccddCategory=",category_list,"&geographySystem=state&detector=probrepswitch&timeResolution=weekly&hasBeenE=1&stratVal=ccddCategory&multiStratVal=&graphOnly=true&numSeries=3&graphOptions=single&seriesPerYear=false&nonZeroComposite=false&removeZeroSeries=true&startMonth=January&stratVal=ccddCategory&multiStratVal=&graphOnly=true&numSeries=3&graphOptions=single&seriesPerYear=false&startMonth=January&nonZeroComposite=false")
+
+#adjust column selection & renaming
+api_data_ts <- get_api_response(url_ts) %>%
+  httr::content(as = "text") %>%
+  jsonlite::fromJSON() %>%
+  data.frame() %>%
+  select(date = timeSeriesData.date,
+         percent = timeSeriesData.count,
+         pct_expected = timeSeriesData.expected,
+         count = timeSeriesData.dataCount,
+         ct_expected = timeSeriesData.expected_dataCount,
+         pvalue = timeSeriesData.levels,
+         alert = timeSeriesData.color,
+         category = timeSeriesData.ccddCategory_display) %>%
+  mutate(date = as.Date(date))
+
+
+```
+
+\newpage
+**Plots of Indicators of Interest**
+```{r plots, echo=FALSE, message=FALSE, echo = FALSE}
+
+asthma <- api_data_ts %>%
+  filter(category == "CDC Asthma CCDD v1")
+
+asthma_pct <- ggplot(data = asthma, aes(x = date, y = percent)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  geom_point(data = subset(asthma, alert == "yellow"), aes(color = "Data Warning"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(asthma, alert == "red"), aes(color = "Data Alert"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to Asthma Among Youth (0-17yrs) in Colorado",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%b %y", date_breaks = "1 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 12),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+afmbroad <- api_data_ts %>%
+  filter(category == "CDC AFM Broad v1-Limit to Pediatric")
+
+afmbroad_pct <- ggplot(data = afmbroad, aes(x = date, y = percent)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  geom_point(data = subset(afmbroad, alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(afmbroad, alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to AFM (broad definition) Among Youth (0-17yrs) in Colorado",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%b %y", date_breaks = "1 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 12),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+afmnarr <- api_data_ts %>%
+  filter(category == "CDC AFM Narrow v1-Limit to Pediatric")
+
+afmnarr_pct <- ggplot(data = afmnarr, aes(x = date, y = percent)) +
+  geom_line(color = wes.pal.zs1[1]) +
+  geom_point(data = subset(afmnarr, alert == "yellow"), color = wes.pal.zs1[3]) +
+  geom_point(data = subset(afmnarr, alert == "red"), color = wes.pal.ff1[1]) +
+  labs(title = "Percent Weekly ED Visits Related to AFM (narrow definition) Among Youth (0-17yrs) in Colorado",
+       x = "Week Start Date",
+       y = "Emergency Visits (Percent)") +
+  theme_classic() +
+  scale_x_date(guide = guide_axis(angle = 45), date_labels = "%b %y", date_breaks = "1 month") +
+  theme(text=element_text(family="trebuchet"),
+        axis.title.x = element_text(size = 11),
+        axis.title.y = element_text(size = 11),
+        axis.text.x = element_text(angle = 0, size = 11),
+        axis.text.y = element_text(angle = 0, size = 11),
+        plot.title = element_text(size = 12),
+        plot.margin=unit(c(1, 1, 1, 1), "cm"),
+        plot.caption = element_text(hjust = 0, size =11))
+
+asthma_pct
+afmbroad_pct
+afmnarr_pct
+
+
+```
